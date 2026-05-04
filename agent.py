@@ -1,6 +1,5 @@
 
 import asyncio
-import uuid
 
 from google.adk.agents import Agent
 from google.adk.runners import Runner
@@ -10,40 +9,35 @@ APP_NAME = "weather_app"
 USER_ID = "user_001"
 
 
-# ── TOOL ──────────────────────────────────────────────────────────────
 def get_weather(city: str) -> dict:
-    weather_data = {
+    data = {
         "chennai": "Hot and humid, 35°C",
         "mumbai": "Humid, 31°C",
         "delhi": "Hazy, 32°C",
-        "bangalore": "Pleasant, 26°C",
-        "hyderabad": "Warm, 30°C",
     }
 
     city = city.lower().strip()
 
-    if city in weather_data:
-        return {"status": "success", "report": weather_data[city]}
+    if city in data:
+        return {"status": "success", "report": data[city]}
 
     return {"status": "error", "error_message": "City not supported"}
 
 
-# ── AGENT ─────────────────────────────────────────────────────────────
 root_agent = Agent(
-    name="weather_assistant",
-    model="gemini-2.5-flash",
-    instruction="Get city → call tool → reply short",
+    name="weather",
+    model="gemini-2.0-flash",   # 🔥 IMPORTANT CHANGE (more stable)
+    instruction="Get city and respond shortly",
     tools=[get_weather],
 )
 
 
-# ── CORE FIX ──────────────────────────────────────────────────────────
-async def run_agent_async(user_message: str) -> str:
-    session_id = str(uuid.uuid4())
-
+async def run_agent_async(msg: str):
     session_service = InMemorySessionService()
 
-    # ✅ CRITICAL FIX — create session BEFORE runner
+    session_id = "temp_session"  # ✅ FIXED stable ID
+
+    # ✅ MUST create session
     await session_service.create_session(
         app_name=APP_NAME,
         user_id=USER_ID,
@@ -57,9 +51,10 @@ async def run_agent_async(user_message: str) -> str:
     )
 
     from google.genai import types as genai_types
+
     content = genai_types.Content(
         role="user",
-        parts=[genai_types.Part(text=user_message)],
+        parts=[genai_types.Part(text=msg)],
     )
 
     reply = ""
@@ -69,20 +64,18 @@ async def run_agent_async(user_message: str) -> str:
         session_id=session_id,
         new_message=content,
     ):
-        if event.is_final_response() and event.content:
+        if event.is_final_response():
             for part in event.content.parts:
                 if hasattr(part, "text"):
                     reply += part.text
 
-    return reply or "No response"
+    return reply
 
 
-# ── SYNC WRAPPER ──────────────────────────────────────────────────────
-def ask_agent(user_message: str) -> str:
+def ask_agent(msg: str):
     try:
-        return asyncio.run(run_agent_async(user_message))
-    except RuntimeError:
+        return asyncio.run(run_agent_async(msg))
+    except:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_agent_async(user_message))
-        
+        return loop.run_until_complete(run_agent_async(msg))        
