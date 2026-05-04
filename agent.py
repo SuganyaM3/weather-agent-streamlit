@@ -10,18 +10,18 @@ APP_NAME = "weather_app"
 USER_ID = "user_001"
 
 
-# ── TOOL ──────────────────────────────────────────────────────────────────────
+# ── Weather Tool ──────────────────────────────────────────────────────────────
 def get_weather(city: str) -> dict:
     weather_data = {
         "san francisco": {"status": "success", "report": "Sunny, 22°C, low humidity."},
         "new york":      {"status": "success", "report": "Cloudy, 18°C, chance of rain."},
         "london":        {"status": "success", "report": "Rainy, 14°C, carry an umbrella!"},
         "tokyo":         {"status": "success", "report": "Clear, 21°C, perfect weather."},
-        "paris":         {"status": "success", "report": "Partly cloudy, 20°C."},
-        "chennai":       {"status": "success", "report": "Hot & humid, 35°C."},
-        "mumbai":        {"status": "success", "report": "Humid, 31°C, monsoon vibes."},
+        "paris":         {"status": "success", "report": "Partly cloudy, 20°C, mild breeze."},
+        "chennai":       {"status": "success", "report": "Hot and humid, 35°C."},
+        "mumbai":        {"status": "success", "report": "Humid, 31°C, monsoon season."},
         "delhi":         {"status": "success", "report": "Hazy, 32°C, moderate AQI."},
-        "sydney":        {"status": "success", "report": "Sunny, 25°C."},
+        "sydney":        {"status": "success", "report": "Sunny, 25°C, gentle breeze."},
         "dubai":         {"status": "success", "report": "Very hot, 40°C."},
         "bangalore":     {"status": "success", "report": "Pleasant, 26°C."},
         "hyderabad":     {"status": "success", "report": "Warm, 30°C."},
@@ -38,19 +38,20 @@ def get_weather(city: str) -> dict:
     }
 
 
-# ── AGENT ─────────────────────────────────────────────────────────────────────
+# ── Agent ─────────────────────────────────────────────────────────────────────
 root_agent = Agent(
     name="weather_assistant",
     model="gemini-2.5-flash",
+    description="Weather assistant",
     instruction="""
     You are Sunny, a friendly weather assistant.
-    Extract city → call get_weather → reply in 1–2 lines.
+    Extract the city → call get_weather(city) → respond in 1–2 lines.
     """,
     tools=[get_weather],
 )
 
 
-# ── CORE EXECUTION ────────────────────────────────────────────────────────────
+# ── Async Execution ───────────────────────────────────────────────────────────
 async def run_agent_async(user_message: str) -> str:
     session_id = str(uuid.uuid4())  # always fresh
 
@@ -70,7 +71,7 @@ async def run_agent_async(user_message: str) -> str:
 
     reply = ""
 
-    # ⚡ IMPORTANT: let runner auto-create session (do NOT pre-create)
+    # ⚡ Let ADK handle session creation internally
     async for event in runner.run_async(
         user_id=USER_ID,
         session_id=session_id,
@@ -84,7 +85,7 @@ async def run_agent_async(user_message: str) -> str:
     return reply or "⚠️ Unable to fetch weather. Try again."
 
 
-# ── SYNC WRAPPER ──────────────────────────────────────────────────────────────
+# ── Sync Wrapper ──────────────────────────────────────────────────────────────
 def ask_agent(user_message: str) -> str:
     try:
         return asyncio.run(run_agent_async(user_message))
