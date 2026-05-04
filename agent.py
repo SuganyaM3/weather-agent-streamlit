@@ -10,52 +10,45 @@ APP_NAME = "weather_app"
 USER_ID = "user_001"
 
 
-# ── Weather Tool ──────────────────────────────────────────────────────────────
+# ── TOOL ──────────────────────────────────────────────────────────────
 def get_weather(city: str) -> dict:
     weather_data = {
-        "san francisco": {"status": "success", "report": "Sunny, 22°C, low humidity."},
-        "new york":      {"status": "success", "report": "Cloudy, 18°C, chance of rain."},
-        "london":        {"status": "success", "report": "Rainy, 14°C, carry an umbrella!"},
-        "tokyo":         {"status": "success", "report": "Clear, 21°C, perfect weather."},
-        "paris":         {"status": "success", "report": "Partly cloudy, 20°C, mild breeze."},
-        "chennai":       {"status": "success", "report": "Hot and humid, 35°C."},
-        "mumbai":        {"status": "success", "report": "Humid, 31°C, monsoon season."},
-        "delhi":         {"status": "success", "report": "Hazy, 32°C, moderate AQI."},
-        "sydney":        {"status": "success", "report": "Sunny, 25°C, gentle breeze."},
-        "dubai":         {"status": "success", "report": "Very hot, 40°C."},
-        "bangalore":     {"status": "success", "report": "Pleasant, 26°C."},
-        "hyderabad":     {"status": "success", "report": "Warm, 30°C."},
+        "chennai": "Hot and humid, 35°C",
+        "mumbai": "Humid, 31°C",
+        "delhi": "Hazy, 32°C",
+        "bangalore": "Pleasant, 26°C",
+        "hyderabad": "Warm, 30°C",
     }
 
-    city_lower = city.lower().strip()
+    city = city.lower().strip()
 
-    if city_lower in weather_data:
-        return weather_data[city_lower]
+    if city in weather_data:
+        return {"status": "success", "report": weather_data[city]}
 
-    return {
-        "status": "error",
-        "error_message": "City not supported. Try Chennai, Mumbai, Delhi, etc."
-    }
+    return {"status": "error", "error_message": "City not supported"}
 
 
-# ── Agent ─────────────────────────────────────────────────────────────────────
+# ── AGENT ─────────────────────────────────────────────────────────────
 root_agent = Agent(
     name="weather_assistant",
     model="gemini-2.5-flash",
-    description="Weather assistant",
-    instruction="""
-    You are Sunny, a friendly weather assistant.
-    Extract the city → call get_weather(city) → respond in 1–2 lines.
-    """,
+    instruction="Get city → call tool → reply short",
     tools=[get_weather],
 )
 
 
-# ── Async Execution ───────────────────────────────────────────────────────────
+# ── CORE FIX ──────────────────────────────────────────────────────────
 async def run_agent_async(user_message: str) -> str:
-    session_id = str(uuid.uuid4())  # always fresh
+    session_id = str(uuid.uuid4())
 
     session_service = InMemorySessionService()
+
+    # ✅ CRITICAL FIX — create session BEFORE runner
+    await session_service.create_session(
+        app_name=APP_NAME,
+        user_id=USER_ID,
+        session_id=session_id,
+    )
 
     runner = Runner(
         agent=root_agent,
@@ -71,7 +64,6 @@ async def run_agent_async(user_message: str) -> str:
 
     reply = ""
 
-    # ⚡ Let ADK handle session creation internally
     async for event in runner.run_async(
         user_id=USER_ID,
         session_id=session_id,
@@ -79,13 +71,13 @@ async def run_agent_async(user_message: str) -> str:
     ):
         if event.is_final_response() and event.content:
             for part in event.content.parts:
-                if hasattr(part, "text") and part.text:
+                if hasattr(part, "text"):
                     reply += part.text
 
-    return reply or "⚠️ Unable to fetch weather. Try again."
+    return reply or "No response"
 
 
-# ── Sync Wrapper ──────────────────────────────────────────────────────────────
+# ── SYNC WRAPPER ──────────────────────────────────────────────────────
 def ask_agent(user_message: str) -> str:
     try:
         return asyncio.run(run_agent_async(user_message))
